@@ -1,5 +1,6 @@
 -- [ VORTEX FX - ENVIRONMENT FIXES TO MAKE SCRIPT ALIVE ] --
 if not game:IsLoaded() then game.Loaded:Wait() end
+warn("Script started successfully")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
