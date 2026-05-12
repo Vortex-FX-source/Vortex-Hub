@@ -70,7 +70,7 @@ local Discord = Window:MakeTab({"Discord", "Info"})
 Discord:AddDiscordInvite({
  Name = "syzo Hub | Community",
  Description = "Join our discord community to receive information about the next update",
- Logo = "rbxassetid://15298567397",
+ Logo = "rbxassetid://115490382631820",
  Invite = "https://discord.gg/sAUgSnu42T"
 })
 local MainFarm = Window:MakeTab({"Farm", "Home"})
