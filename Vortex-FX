@@ -59,7 +59,174 @@ if not table.foreach then table.foreach = function(t, f) for k, v in pairs(t) do
 local VerifyNPC = function() return true end
 local AttackDistance = function() end 
 -- [ END OF FIXES, YOUR EXACT SCRIPT STARTS BELOW ] --
+
+-- =================== VORTEX CORE ENGINE ===================
+-- (All missing functions and global variables that make the UI work)
+
+-- Safe remote invocation
+function FireRemote(remoteName, ...)
+    local rem = ReplicatedStorage:WaitForChild("Remotes", 9e9):WaitForChild(remoteName, 9e9)
+    if rem then
+        rem:FireServer(...)
+    end
+end
+
+-- Smooth teleport (tween)
+local TweenService = game:GetService("TweenService")
+function PlayerTP(cframe)
+    local char = Player.Character
+    if char and char.PrimaryPart then
+        local targ = typeof(cframe) == "Vector3" and CFrame.new(cframe) or cframe
+        local info = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(char.PrimaryPart, info, {CFrame = targ})
+        tween:Play()
+        tween.Completed:Wait()
+    end
+end
+
+-- Check if a tool is owned
+function VerifyTool(name)
+    for _,tool in pairs((Player.Character and Player.Character:GetChildren()) or {}) do
+        if tool:IsA("Tool") and tool.Name == name then return true end
+    end
+    for _,tool in pairs(Player.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name == name then return true end
+    end
+    return false
+end
+
+-- Get mastery level of a stat
+function GetToolLevel(name)
+    local stats = Player.Data.Stats
+    local map = {["Melee"]="Melee", ["Defense"]="Defense", ["Sword"]="Sword", ["Gun"]="Gun", ["Demon Fruit"]="Demon Fruit"}
+    return stats[map[name] or name].Level.Value
+end
+
+-- Equip a tool by name
+function EquipToolName(toolName)
+    local char = Player.Character
+    local bp = Player.Backpack
+    local tool
+    for _,v in pairs(bp:GetChildren()) do if v:IsA("Tool") and v.Name == toolName then tool = v; break end end
+    for _,v in pairs(char:GetChildren()) do if v:IsA("Tool") and v.Name == toolName then tool = v; break end end
+    if tool then char.Humanoid:EquipTool(tool) end
+end
+
+-- Equip current farm tool
+function EquipTool()
+    EquipToolName(getgenv().FarmTool or "Melee")
+end
+
+-- Bring NPC closer
+function BringNPC(enemy, anchor)
+    if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+        enemy.HumanoidRootPart.CFrame = Player.Character.PrimaryPart.CFrame + Vector3.new(0,0,5)
+    end
+end
+
+-- Activate haki
+function ActiveHaki()
+    FireRemote("ActivateBuso")
+end
+
+-- Simulate attack (B button)
+function PlayerClick()
+    local vim = game:GetService("VirtualInputManager")
+    vim:SendKeyEvent(true, Enum.KeyCode.ButtonB, false, game)
+    task.wait(0.05)
+    vim:SendKeyEvent(false, Enum.KeyCode.ButtonB, false, game)
+end
+
+-- Press keyboard key
+function KeyboardPress(key)
+    local vim = game:GetService("VirtualInputManager")
+    vim:SendKeyEvent(true, Enum.KeyCode[key], false, game)
+    task.wait(0.05)
+    vim:SendKeyEvent(false, Enum.KeyCode[key], false, game)
+end
+
+-- Server hop
+function ServerHop()
+    local ts = game:GetService("TeleportService")
+    ts:TeleportToPlaceInstance(game.PlaceId, ts:GetServerId())
+end
+
+-- Verify NPC exists
+function VerifyNPC(name)
+    return (workspace:FindFirstChild("Enemies") or workspace):FindFirstChild(name) ~= nil
+end
+
+-- Dummy quest check
+function VerifyQuest(name)
+    return VerifyNPC(name)
+end
+
+-- Global Map variable (used in Rain Fruit)
+local Map = workspace:WaitForChild("Map", 9e9)
+
+-- Click detector helper
+function fireclickdetector(obj)
+    if obj then obj:Fire() end
+end
+
+-- Missing stubs (no error, but no auto-farm)
+function AutoFarm_Level() end
+function AutoFarmNearest() end
+function AutoPiratesSea() end
+function AutoFactory() end
+function AutoFarmBone() end
+function AutoSoulReaper() end
+function AutoFarmEctoplasm() end
+function AutoChestTween() end
+function AutoChestBypass() end
+function AutoFarmBossSelected() end
+function KillAllBosses() end
+function AutoFarmMaterial() end
+function AutoFarmMastery() end
+function AutoFarmSea() end
+function AutoKitsuneIsland() end
+function BuyNewBoat() end
+function AutoSecondSea() end
+function AutoUnlockSaber() end
+function AutoEnelBossPole() end
+function AutoSawBoss() end
+function AutoThirdSea() end
+function AutoKillDonSwan() end
+function AutoBartiloQuest() end
+function AutoRengoku() end
+function AutoRaceV2() end
+function AutoCursedCaptain() end
+function AutoDarkbeard() end
+function AutoKillLawBoss() end
+function AutoEliteHunter() end
+function AutoTushita() end
+function AutoCakePrince() end
+function AutoDoughKing() end
+function AutoRipIndra() end
+function AutoMusketeerHat() end
+function AutoRainbowHaki() end
+function AutoBuyHakiColor() end
+function EspFlowers() end
+function EspPlayer() end
+function EspFruits() end
+function EspChests() end
+function EspIslands() end
+function Get_Fruit() return "" end
+function VerifyToolTip() return false end
+function EquipToolTip() end
+function AimBotPart() end
+function Configure() return false end
+function QuestVisible() end
+function GetEnemies() return nil end
+function TweenNPCSpawn() end
+function BuyFightStyle(style) FireRemote(style) end
+function FruitFind() return nil end  -- needed for fruit teleport
+function KillAura() end  -- needed for auto race trial
+-- (End of Core Engine)
+
+-- Load the UI library (make sure your Vortex-FX-UI-lua file is fixed)
 local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Vortex-FX-source/Vortex-Hub/refs/heads/main/Vortex-FX-UI-lua"))()
+
 local Window = redzlib:MakeWindow({
  Title = "vortex fx  : Blox Fruits",
  SubTitle = "by syzo gamer ",
@@ -70,7 +237,7 @@ local Discord = Window:MakeTab({"Discord", "Info"})
 Discord:AddDiscordInvite({
  Name = "syzo Hub | Community",
  Description = "Join our discord community to receive information about the next update",
- Logo = "rbxassetid://115490382631820",
+ Logo = "rbxassetid://115490382631820",  -- Your personal logo ID (make sure it's a valid decal)
  Invite = "https://discord.gg/sAUgSnu42T"
 })
 local MainFarm = Window:MakeTab({"Farm", "Home"})
