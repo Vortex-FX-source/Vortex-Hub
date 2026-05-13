@@ -1,0 +1,424 @@
+-- [[ 
+-- Vortex FX - Anime Waifu Premium Hub
+-- Upgraded, Branded, & Expanded by Syzo Gamer
+-- Features: 23+ New Tools, ESP, Automation, FPS Boosters
+-- ]]
+
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local CollectRemote = remotes:WaitForChild("CollectHeldPack")
+local CollectAllCardCash = remotes:WaitForChild("CollectAllCardCash")
+local PackReroll = remotes:WaitForChild("PackReroll")
+local PackPurchase = remotes:WaitForChild("PackPurchase")
+local EquipPackTool = remotes:WaitForChild("EquipPackTool")
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Vortex FX | Anime Waifu 🌪️",
+   LoadingTitle = "Loading Vortex Core...",
+   LoadingSubtitle = "by Syzo Gamer",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "VortexHub", 
+      FileName = "VortexWaifuPremium"
+   },
+   Discord = {
+      Enabled = true,
+      Invite = "sAUgSnu42T", 
+      RememberJoins = true 
+   },
+   KeySystem = false,
+})
+
+local SaveFile = getgenv().VortexSave or {}
+getgenv().VortexSave = SaveFile
+
+--################================ 1. MAIN TAB ================################--
+local MainTab = Window:CreateTab("Main Farm", 4483362458)
+MainTab:CreateSection("Auto Farming")
+
+MainTab:CreateToggle({
+   Name = "Auto Collect Cash",
+   CurrentValue = false,
+   Flag = "AutoCollectFlag",
+   Callback = function(Value)
+      SaveFile.AutoCollect = Value
+      if SaveFile.AutoCollect then
+         task.spawn(function()
+            while SaveFile.AutoCollect do
+               CollectAllCardCash:FireServer()
+               task.wait(1) 
+            end
+         end)
+      end
+   end,
+})
+
+MainTab:CreateButton({Name = "Collect All Cash (Once)", Callback = function() CollectAllCardCash:FireServer() end})
+
+MainTab:CreateButton({
+   Name = "Collect All Grade Tokens",
+   Callback = function()
+      local character = Player.Character or Player.CharacterAdded:Wait()
+      local hrp = character:WaitForChild("HumanoidRootPart")
+      local originalCFrame = hrp.CFrame
+      local tokensFolder = Workspace:FindFirstChild("Systems") and Workspace.Systems:FindFirstChild("GradeTokens")
+      if not tokensFolder then Rayfield:Notify({Title="Vortex FX", Content="No GradeTokens found!", Duration=3}) return end
+      for _, token in ipairs(tokensFolder:GetDescendants()) do
+         if token:IsA("BasePart") and token.Name == "GradeToken" then
+            hrp.CFrame = token.CFrame + Vector3.new(0, 3, 0)
+            task.wait(0.15) 
+         end
+      end
+      task.wait(0.2)
+      hrp.CFrame = originalCFrame
+   end,
+})
+
+--################================ 2. AUTO BUY TAB ================################--
+SaveFile.SelectedRarities = {["All"]=false, ["Normal"]=false, ["Gold"]=false, ["Platinum"]=false, ["Emerald"]=false, ["Diamond"]=false, ["Rainbow"]=false}
+SaveFile.SelectedRanks = {["Princess"]=false, ["Queen"]=false, ["Matriarch"]=false, ["Empress"]=false, ["Seraph"]=false, ["Divine"]=false, ["Celestial"]=false, ["Goddess"]=false, ["Valkyrie"]=false, ["Archon"]=false}
+local AutoBuy = Window:CreateTab("Auto Buy", 4483362458)
+
+AutoBuy:CreateDropdown({
+   Name = "Select Active Packs",
+   Options = {"Princess", "Queen", "Matriarch", "Empress", "Seraph", "Divine", "Celestial", "Goddess", "Valkyrie", "Archon"},
+   CurrentOption = {}, MultipleOptions = true, Flag = "RankDropdown", 
+   Callback = function(Options)
+      for rank, _ in pairs(SaveFile.SelectedRanks) do SaveFile.SelectedRanks[rank] = false end
+      for _, selectedName in ipairs(Options) do SaveFile.SelectedRanks[selectedName] = true end
+   end,
+})
+
+AutoBuy:CreateDropdown({
+    Name = "Select Rarities",
+    Options = {"All", "Normal", "Gold", "Platinum", "Emerald", "Diamond", "Rainbow"},
+    CurrentOption = {}, MultipleOptions = true, Flag = "RarityDropdown",
+    Callback = function(Options)
+        for rarity, _ in pairs(SaveFile.SelectedRarities) do SaveFile.SelectedRarities[rarity] = false end
+        for _, selected in ipairs(Options) do SaveFile.SelectedRarities[selected] = true end
+    end,
+})
+
+AutoBuy:CreateToggle({
+   Name = "Auto Roll Packs",
+   CurrentValue = false, Flag = "AutoRollFlag",
+   Callback = function(Value)
+      SaveFile.AutoRoll = Value
+      if SaveFile.AutoRoll then
+         task.spawn(function() while SaveFile.AutoRoll do PackReroll:FireServer(); task.wait(3) end end)
+      end
+   end,
+})
+
+AutoBuy:CreateToggle({
+   Name = "Auto Buy Selected Packs",
+   CurrentValue = false, Flag = "AutoBuyFlag",
+   Callback = function(Value)
+      SaveFile.AutoBuyPacks = Value
+      if SaveFile.AutoBuyPacks then
+         task.spawn(function()
+            while SaveFile.AutoBuyPacks do
+               local myPlot = Workspace.Map.PlotModels:FindFirstChild(Player.Name)
+               local station = myPlot and myPlot:FindFirstChild("Systems") and myPlot.Systems:FindFirstChild("ActivePackStation") and myPlot.Systems.ActivePackStation:FindFirstChild("Station") and myPlot.Systems.ActivePackStation.Station:FindFirstChild("PackParts")
+               if station then
+                  for i = 1, 4 do
+                     local packFolder = station:FindFirstChild("Pack" .. i)
+                     if packFolder then
+                        for _, item in ipairs(packFolder:GetChildren()) do
+                            if item.Name:find("ActivePack") then
+                                local itemRank = item.Name:gsub("ActivePack%-", "")
+                                local gui = item:FindFirstChild("PackPriceBillboardGui")
+                                local itemRarity = (gui and gui:FindFirstChild("Frame") and gui.Frame:FindFirstChild("VariantLabel") and gui.Frame.VariantLabel.Text) or "Normal"
+                                if SaveFile.SelectedRanks[itemRank] and (SaveFile.SelectedRarities["All"] or SaveFile.SelectedRarities[itemRarity]) then
+                                    PackPurchase:FireServer(i)
+                                    task.wait(0.5)
+                                    break
+                                end
+                            end
+                        end
+                     end
+                  end
+               end
+               task.wait(1) 
+            end
+         end)
+      end
+   end,
+})
+
+--################================ 3. AUTO PLACE TAB ================################--
+local AutoPlace = Window:CreateTab("Auto Place", 4483362458)
+AutoPlace:CreateToggle({
+   Name = "Auto Open Ready Packs",
+   CurrentValue = false, Flag = "AutoOpenFlag",
+   Callback = function(Value)
+      SaveFile.AutoOpenPacks = Value
+      if SaveFile.AutoOpenPacks then
+         task.spawn(function()
+            while SaveFile.AutoOpenPacks do
+               local myPlot = Workspace.Map.PlotModels:FindFirstChild(Player.Name)
+               if myPlot and myPlot:FindFirstChild("Systems") and myPlot.Systems:FindFirstChild("PlacedPacks") then
+                  for _, pack in ipairs(myPlot.Systems.PlacedPacks:GetChildren()) do
+                     local gui = pack:FindFirstChild("PackModel") and pack.PackModel:FindFirstChild("PackTimerBillboardGui")
+                     if gui and gui.Frame.TimerLabel.Text == "Ready" then CollectRemote:FireServer(pack.Name); task.wait(0.1) end
+                  end
+               end
+               task.wait(2) 
+            end
+         end)
+      end
+   end,
+})
+
+--################================ 4. PLAYER TAB (NEW!) ================################--
+local PlayerTab = Window:CreateTab("Player Hacks", 4483362458)
+PlayerTab:CreateSection("Movement Settings")
+
+PlayerTab:CreateSlider({
+   Name = "WalkSpeed Override", Range = {16, 300}, Increment = 1, CurrentValue = 16, Flag = "WSSlider",
+   Callback = function(Value) if Player.Character and Player.Character:FindFirstChild("Humanoid") then Player.Character.Humanoid.WalkSpeed = Value end end,
+})
+
+PlayerTab:CreateSlider({
+   Name = "JumpPower Override", Range = {50, 400}, Increment = 1, CurrentValue = 50, Flag = "JPSlider",
+   Callback = function(Value) if Player.Character and Player.Character:FindFirstChild("Humanoid") then Player.Character.Humanoid.UseJumpPower = true; Player.Character.Humanoid.JumpPower = Value end end,
+})
+
+PlayerTab:CreateToggle({
+   Name = "Infinite Jump (Fly mid-air)", CurrentValue = false, Flag = "InfJump",
+   Callback = function(Value) getgenv().InfJump = Value end,
+})
+
+UserInputService.JumpRequest:Connect(function()
+    if getgenv().InfJump and Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+PlayerTab:CreateToggle({
+   Name = "Noclip (Walk through walls)", CurrentValue = false, Flag = "Noclip",
+   Callback = function(Value) getgenv().Noclip = Value end,
+})
+
+RunService.Stepped:Connect(function()
+    if getgenv().Noclip and Player.Character then
+        for _, part in pairs(Player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+PlayerTab:CreateSlider({
+   Name = "Camera FOV", Range = {70, 120}, Increment = 1, CurrentValue = 70, Flag = "FOV",
+   Callback = function(Value) workspace.CurrentCamera.FieldOfView = Value end,
+})
+
+PlayerTab:CreateSlider({
+   Name = "Custom Gravity", Range = {0, 196}, Increment = 1, CurrentValue = 196, Flag = "Grav",
+   Callback = function(Value) workspace.Gravity = Value end,
+})
+
+--################================ 5. VISUALS TAB (NEW!) ================################--
+local VisualsTab = Window:CreateTab("Visuals / ESP", 4483362458)
+VisualsTab:CreateSection("ESP Options")
+
+local function clearESP(espName)
+    for _,v in pairs(CoreGui:GetChildren()) do if v.Name == espName then v:Destroy() end end
+end
+
+VisualsTab:CreateToggle({
+   Name = "Player ESP", CurrentValue = false, Flag = "PlayerESP",
+   Callback = function(Value)
+       getgenv().PlayerESP = Value
+       task.spawn(function()
+           while task.wait(1) do
+               clearESP("VortexPlayerESP")
+               if getgenv().PlayerESP then
+                   for _, p in pairs(Players:GetPlayers()) do
+                       if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                           local hl = Instance.new("Highlight")
+                           hl.Name = "VortexPlayerESP"
+                           hl.Adornee = p.Character
+                           hl.FillColor = Color3.fromRGB(0, 255, 255)
+                           hl.Parent = CoreGui
+                       end
+                   end
+               end
+           end
+       end)
+   end,
+})
+
+VisualsTab:CreateSection("World Enhancements")
+VisualsTab:CreateToggle({
+   Name = "Fullbright (No Shadows/Night)", CurrentValue = false, Flag = "Fullbright",
+   Callback = function(Value)
+       getgenv().Fullbright = Value
+       if Value then
+           Lighting.Brightness = 2; Lighting.ClockTime = 14; Lighting.GlobalShadows = false
+       else
+           Lighting.Brightness = 1; Lighting.GlobalShadows = true
+       end
+   end,
+})
+
+VisualsTab:CreateButton({Name = "Remove Fog", Callback = function() Lighting.FogEnd = 100000 end})
+
+--################================ 6. TELEPORTS TAB (NEW!) ================################--
+local TPTab = Window:CreateTab("Teleports", 4483362458)
+TPTab:CreateSection("Quick Travel")
+
+TPTab:CreateButton({
+   Name = "Teleport to Spawn",
+   Callback = function()
+       if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+           Player.Character.HumanoidRootPart.CFrame = CFrame.new(0, 10, 0) -- Generic spawn height
+       end
+   end,
+})
+
+TPTab:CreateButton({
+   Name = "Teleport to My Plot",
+   Callback = function()
+       local plotFolder = workspace:WaitForChild("Map"):WaitForChild("PlotModels")
+       local userPlot = plotFolder:FindFirstChild(Player.Name)
+       if userPlot and userPlot:FindFirstChild("Base") then
+           Player.Character.HumanoidRootPart.CFrame = userPlot.Base.CFrame + Vector3.new(0, 10, 0)
+       end
+   end,
+})
+
+--################================ 7. PERFORMANCE TAB (NEW!) ================################--
+local PerfTab = Window:CreateTab("Performance", 4483362458)
+PerfTab:CreateSection("FPS Boosters")
+
+PerfTab:CreateButton({
+   Name = "Potato Mode (Max FPS)",
+   Callback = function()
+       for _,v in pairs(workspace:GetDescendants()) do
+           if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic; v.Reflectance = 0
+           elseif v:IsA("Decal") or v:IsA("Texture") then v:Destroy() end
+       end
+       Lighting.GlobalShadows = false
+       Rayfield:Notify({Title="Vortex FX", Content="Potato Mode Enabled! Textures removed.", Duration=3})
+   end,
+})
+
+PerfTab:CreateToggle({
+   Name = "Disable Rendering (Extreme FPS)", CurrentValue = false, Flag = "DisableRender",
+   Callback = function(Value) RunService:Set3dRenderingEnabled(not Value) end,
+})
+
+--################================ 8. AUTOMATION & FUN (NEW!) ================################--
+local FunTab = Window:CreateTab("Fun & Automation", 4483362458)
+
+FunTab:CreateButton({
+   Name = "Server Hop",
+   Callback = function()
+       local ts = game:GetService("TeleportService")
+       ts:TeleportToPlaceInstance(game.PlaceId, ts:GetServerId())
+   end,
+})
+
+FunTab:CreateToggle({
+   Name = "Spinbot (Troll)", CurrentValue = false, Flag = "Spinbot",
+   Callback = function(Value)
+       getgenv().Spin = Value
+       task.spawn(function()
+           while getgenv().Spin do
+               if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                   Player.Character.HumanoidRootPart.CFrame = Player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(50), 0)
+               end
+               task.wait()
+           end
+       end)
+   end,
+})
+
+FunTab:CreateButton({
+   Name = "Chat 'Vortex FX On Top!'",
+   Callback = function()
+       local rgs = game:GetService("ReplicatedStorage")
+       if rgs:FindFirstChild("DefaultChatSystemChatEvents") then
+           rgs.DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Vortex FX Hub is the best! 🌪️", "All")
+       end
+   end,
+})
+
+--################================ 9. SETTINGS & CREDITS ================################--
+local CreditsTab = Window:CreateTab("Settings", 4483362458)
+CreditsTab:CreateLabel("Engine: Vortex FX Hub V2.0")
+CreditsTab:CreateLabel("Owner & Developer: Syzo Gamer", 4483362458, Color3.fromRGB(0, 255, 255), false)
+
+CreditsTab:CreateButton({
+   Name = "Copy Discord Invite",
+   Callback = function()
+      setclipboard("https://discord.gg/sAUgSnu42T")
+      Rayfield:Notify({Title = "Vortex FX", Content = "Discord link copied!", Duration = 3})
+   end,
+})
+
+local AntiAfkEnabled = false
+local AntiAfkThread
+CreditsTab:CreateToggle({
+   Name = "Anti-AFK", CurrentValue = false, Flag = "AntiAfkFlag",
+   Callback = function(Value)
+      AntiAfkEnabled = Value
+      if AntiAfkThread then task.cancel(AntiAfkThread); AntiAfkThread = nil end
+      if AntiAfkEnabled then
+         AntiAfkThread = task.spawn(function()
+            while AntiAfkEnabled do
+               task.wait(300) 
+               VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+               task.wait(0.01)
+               VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+            end
+         end)
+      else
+         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+      end
+   end,
+})
+
+CreditsTab:CreateKeybind({
+   Name = "Toggle UI Menu",
+   CurrentKeybind = "RightShift",
+   HoldToInteract = false,
+   Flag = "ToggleUIBind",
+   Callback = function()
+      -- Internal Rayfield toggle logic handles the UI minimization
+   end,
+})
+
+local Themes = {["Default"]="Default", ["Amber Glow"]="AmberGlow", ["Amethyst"]="Amethyst", ["Bloom"]="Bloom", ["Dark Blue"]="DarkBlue", ["Green"]="Green", ["Light"]="Light", ["Ocean"]="Ocean", ["Serenity"]="Serenity"}
+local ThemeList = {}
+for name, _ in pairs(Themes) do table.insert(ThemeList, name) end
+
+CreditsTab:CreateDropdown({
+   Name = "Select UI Theme",
+   Options = ThemeList,
+   CurrentOption = {"Default"},
+   MultipleOptions = false, Flag = "ThemeSelector", 
+   Callback = function(Option)
+      pcall(function() Window:ModifyTheme(Themes[Option[1]]) end)
+   end,
+})
+
+CreditsTab:CreateButton({
+   Name = "Destroy UI", 
+   Callback = function()
+      SaveFile.AutoCollect = false; SaveFile.AutoRoll = false; SaveFile.AutoOpenPacks = false; SaveFile.AutoBuyPacks = false; SaveFile.AutoPlace = false; getgenv().PlayerESP = false; getgenv().Spin = false; getgenv().Noclip = false
+      Rayfield:Destroy()
+   end,
+})
