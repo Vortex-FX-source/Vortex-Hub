@@ -62,6 +62,7 @@ local AttackDistance = function() end
 
 local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Vortex-FX-source/Vortex-Hub/refs/heads/main/Vortex-FX-UI-lua"))()
 warn("Library loaded successfully")  -- <-- add this
+
 -- =================== VORTEX CORE ENGINE ===================
 function FireRemote(remoteName, ...)
     local rem = ReplicatedStorage:WaitForChild("Remotes", 9e9):WaitForChild(remoteName, 9e9)
