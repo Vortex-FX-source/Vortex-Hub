@@ -1,0 +1,107 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+   Name = "Vortex",
+   Icon = 83537470545471,
+   LoadingTitle = "Vortex by Syzo Gamer",
+   LoadingSubtitle = "Loading UI...",
+   ShowText = "Vortex",
+   Theme = "Serenity",
+   ToggleUIKeybind = "K",
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "VortexHub"
+   },
+   Discord = {
+      Enabled = true,
+      Invite = "7fXDf2h3cE",
+      RememberJoins = true
+   },
+   KeySystem = false, -- Key system removed
+   KeySettings = {}    -- Empty, no key needed
+})
+
+local Tab = Window:CreateTab("Categories", "badge-alert")
+
+-- Killers Section
+local KillersSection = Tab:CreateSection("Killer Features")
+Tab:CreateButton({
+   Name = "Killer Feature 1",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/cprotogy-cell/vortezhub/refs/heads/main/Salshe"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Killer Feature 2",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/John%20doe"))()
+   end
+})
+
+-- Survivors Section
+local SurvivorsSection = Tab:CreateSection("Survivor Features")
+Tab:CreateButton({
+   Name = "Survivor Feature 1",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/Final%20elliot"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Survivor Feature 2",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/Noob"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Survivor Feature 3",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/007n7"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Survivor Feature 4",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/Final%20Shedletskey"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Survivor Feature 5",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/Dusekkar"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Survivor Feature 6",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/Final%20chance"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Survivor Feature 7",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/Guest%201337"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Survivor Feature 8",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortexhub/refs/heads/main/Two%20time"))()
+   end
+})
+
+-- Others Section
+local OthersSection = Tab:CreateSection("Other")
+Tab:CreateButton({
+   Name = "Utility Script",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/articbeatles0-ship-it/vortex/refs/heads/main/Main%20Script"))()
+   end
+})
+Tab:CreateButton({
+   Name = "Destroy UI",
+   Callback = function()
+      Rayfield:Destroy()
+   end
+})
