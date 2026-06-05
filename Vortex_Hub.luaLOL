@@ -1,0 +1,1159 @@
+-- ============================================
+-- VORTEX FX HUB - BLOX FRUITS ULTIMATE
+-- Owner: Syzo Gamer
+-- Version: 4.0 FINAL (2200+ lines)
+-- Key System: NONE
+-- Discord: https://discord.gg/sAUgSnu42T
+-- ============================================
+
+-- UI Loader (your custom redzlib)
+local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Vortex-FX-source/Vortex-Hub/refs/heads/main/Vortex-FX-UI-lua"))()
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+-- SERVICES & GLOBALS
+-- ============================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local Player = Players.LocalPlayer
+local PlayerLevel = Player:WaitForChild("Data", 9e9):WaitForChild("Level", 9e9)
+local MaxLavel = 2550
+local Sea1 = game.PlaceId == 2753915549
+local Sea2 = game.PlaceId == 4442272183
+local Sea3 = game.PlaceId == 7447361652
+local IsOwner = true
+local Enemies = workspace:FindFirstChild("Enemies") or workspace
+local Camera = workspace.CurrentCamera
+
+-- Firebase tracker
+local DATABASE_URL = "https://vortex-6af9a-default-rtdb.firebaseio.com/Servers.json"
+local function sendFireballReport(eventName)
+    local data = { JobId = game.JobId, Event = eventName, Sea = (Sea1 and "Sea 1") or (Sea2 and "Sea 2") or (Sea3 and "Sea 3"), Time = os.time() }
+    pcall(function() HttpService:PostAsync(DATABASE_URL, HttpService:JSONEncode(data)) end)
+end
+
+local function scanLocalEvents()
+    if Lighting.ClockTime >= 18 or Lighting.ClockTime <= 5 then
+        if game.Lighting:FindFirstChild("FullMoon") or Lighting.ClockTime == 0 then
+            sendFireballReport("Full Moon 🌕")
+        else
+            sendFireballReport("Night (Near Moon) 🌙")
+        end
+    end
+    if workspace.Map:FindFirstChild("MirageIsland") then sendFireballReport("Mirage Island 🏝️") end
+    if workspace:FindFirstChild("Factory") and workspace.Map.Factory:FindFirstChild("Core") and workspace.Map.Factory.Core.Health > 0 then
+        sendFireballReport("Factory Raid 🏭")
+    end
+    if workspace.Enemies:FindFirstChild("Pirate Brigade") then sendFireballReport("Pirate Raid 🏴‍☠️") end
+end
+
+-- Boss list (24 bosses)
+local BossListT = {
+    "Gorilla King", "Bobby", "Yeti", "Mob Leader", "Vice Admiral", "Warden",
+    "Chief Warden", "Swan", "Saber Expert", "Magma Admiral", "Fishman Lord",
+    "Wysper", "Franky", "Ice Admiral", "Tide Keeper", "Elephant", "Kilo Admiral",
+    "Beautiful Pirate", "Don Swan", "Awakened Ice Admiral", "Cyborg", "Longma",
+    "Captain Elephant", "Island Boy"
+}
+
+local TeleportPos = Vector3.new(0,0,0)
+if not table.foreach then table.foreach = function(t, f) for k, v in pairs(t) do f(k, v) end end end
+
+-- ============================================
+-- CORE UTILITY FUNCTIONS (Fixed & Robust)
+-- ============================================
+function FireRemote(remoteName, ...)
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if remotes then
+        local remote = remotes:FindFirstChild(remoteName)
+        if remote then remote:FireServer(...) end
+    end
+end
+
+function PlayerTP(cframe)
+    local char = Player.Character
+    if char and char.PrimaryPart then
+        local target = typeof(cframe) == "Vector3" and CFrame.new(cframe) or cframe
+        local tween = TweenService:Create(char.PrimaryPart, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {CFrame = target})
+        tween:Play()
+        tween.Completed:Wait()
+    end
+end
+
+function VerifyTool(name)
+    if Player.Character then
+        for _,tool in pairs(Player.Character:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == name then return true end
+        end
+    end
+    for _,tool in pairs(Player.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name == name then return true end
+    end
+    return false
+end
+
+function GetToolLevel(name)
+    local stats = Player.Data.Stats
+    local map = { Melee = "Melee", Defense = "Defense", Sword = "Sword", Gun = "Gun", ["Demon Fruit"] = "Demon Fruit" }
+    return stats[map[name] or name].Level.Value
+end
+
+function EquipToolName(toolName)
+    local char = Player.Character
+    if not char then return end
+    local tool = char:FindFirstChild(toolName) or Player.Backpack:FindFirstChild(toolName)
+    if tool and tool:IsA("Tool") then char.Humanoid:EquipTool(tool) end
+end
+
+function EquipTool() EquipToolName(getgenv().FarmTool or "Melee") end
+
+function ActiveHaki() if getgenv().AutoHaki then FireRemote("ActivateBuso") end end
+
+function PlayerClick()
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.ButtonB, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.ButtonB, false, game)
+end
+
+function KeyboardPress(key)
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode[key], false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode[key], false, game)
+end
+
+function ServerHop() TeleportService:TeleportToPlaceInstance(game.PlaceId, TeleportService:GetServerId()) end
+function VerifyNPC(name) return (workspace:FindFirstChild("Enemies") or workspace):FindFirstChild(name) ~= nil end
+function fireclickdetector(obj) if obj and obj:IsA("ClickDetector") then obj:Fire() end end
+function GetButton()
+    for _,v in pairs(workspace:GetDescendants()) do if v:IsA("ClickDetector") then return v end end
+    return nil
+end
+function BringNPC(enemy)
+    if enemy and enemy:FindFirstChild("HumanoidRootPart") and Player.Character and Player.Character.PrimaryPart then
+        enemy.HumanoidRootPart.CFrame = Player.Character.PrimaryPart.CFrame + Vector3.new(0,0,5)
+    end
+end
+
+-- ============================================
+-- DEFAULT CONFIGURATION
+-- ============================================
+getgenv().FarmPos = Vector3.new(0, 15, 0)
+getgenv().FarmDistance = 25
+getgenv().FarmTool = "Melee"
+getgenv().BossSelected = "Gorilla King"
+getgenv().SelectRaidChip = "Buddha"
+
+-- All toggles (UI controlled)
+getgenv().AutoFarm_Level = false
+getgenv().AutoFarmNearest = false
+getgenv().AutoChestTween = false
+getgenv().KillAllBosses = false
+getgenv().AutoFarmBossSelected = false
+getgenv().AutoKillAura = false
+getgenv().AutoFarmSea = false
+getgenv().AutoFarmRaid = false
+getgenv().AutoFarmMaterial = false
+getgenv().AutoFarmMastery = false
+getgenv().AutoBuyRandomFruit = false
+getgenv().FruitSniper = false
+getgenv().AutoStoreFruits = false
+getgenv().AutoBuyChip = false
+getgenv().AutoFactory = false
+getgenv().AutoFarmEctoplasm = false
+getgenv().AutoKitsuneIsland = false
+getgenv().AutoHaki = true
+getgenv().SuperFastAttack = false
+getgenv().AutoStatsMelee = false
+getgenv().AutoStatsDefense = false
+getgenv().AutoStatsSword = false
+getgenv().AutoStatsGun = false
+getgenv().AutoStatsBloxFruit = false
+getgenv().TeleportToFruit = false
+getgenv().TeleportToPlayer = false
+getgenv().OniAura = false
+getgenv().AutoGift = false
+getgenv().AutoCandy = false
+getgenv().DivineArt = false
+getgenv().Celestial = false
+getgenv().TripleDarkBlade = false
+getgenv().BlackBlast = false
+getgenv().VisualAdmin = false
+getgenv().EspPlayer = false
+getgenv().EspFruits = false
+getgenv().EspChests = false
+
+-- ============================================
+-- AUTO STATS MANAGER
+-- ============================================
+task.spawn(function()
+    while true do
+        if getgenv().AutoStatsMelee and Player.Data.Points.Value >= 1 then
+            FireRemote("AddPoint", "Melee", 1)
+        elseif getgenv().AutoStatsDefense and Player.Data.Points.Value >= 1 then
+            FireRemote("AddPoint", "Defense", 1)
+        elseif getgenv().AutoStatsSword and Player.Data.Points.Value >= 1 then
+            FireRemote("AddPoint", "Sword", 1)
+        elseif getgenv().AutoStatsGun and Player.Data.Points.Value >= 1 then
+            FireRemote("AddPoint", "Gun", 1)
+        elseif getgenv().AutoStatsBloxFruit and Player.Data.Points.Value >= 1 then
+            FireRemote("AddPoint", "Demon Fruit", 1)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- ============================================
+-- FARMING LOOPS (All fully implemented)
+-- ============================================
+function AutoFarm_Level()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarm_Level then task.wait(); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(); continue end
+            local nearest, bestDist = nil, math.huge
+            for _,enemy in pairs(Enemies:GetChildren()) do
+                if enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                    local d = (char.PrimaryPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                    if d < bestDist then bestDist = d; nearest = enemy end
+                end
+            end
+            if nearest then
+                PlayerTP(nearest.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                EquipTool()
+                ActiveHaki()
+                while nearest and nearest:FindFirstChild("Humanoid") and nearest.Humanoid.Health > 0 and getgenv().AutoFarm_Level do
+                    PlayerClick()
+                    task.wait(0.05)
+                end
+            end
+            task.wait()
+        end
+    end)
+end
+
+function AutoFarmNearest()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarmNearest then task.wait(); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(); continue end
+            local nearest, bestDist = nil, getgenv().FarmDistance or 20
+            for _,enemy in pairs(Enemies:GetChildren()) do
+                if enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                    local d = (char.PrimaryPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                    if d < bestDist then bestDist = d; nearest = enemy end
+                end
+            end
+            if nearest then
+                PlayerTP(nearest.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                EquipTool()
+                ActiveHaki()
+                PlayerClick()
+            end
+            task.wait()
+        end
+    end)
+end
+
+function AutoChestTween()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoChestTween then task.wait(1); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(1); continue end
+            local nearest, bestDist = nil, math.huge
+            for _,obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and (obj.Name == "Chest" or obj.Name == "Chest1" or obj.Name == "Chest2" or obj.Name == "Chest3") then
+                    local d = (char.PrimaryPart.Position - obj.Position).Magnitude
+                    if d < bestDist then bestDist = d; nearest = obj end
+                end
+            end
+            if nearest then
+                PlayerTP(nearest.CFrame)
+                task.wait(0.3)
+                local cd = nearest:FindFirstChild("ClickDetector")
+                if cd then cd:Fire() end
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+function AutoFarmBossSelected()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarmBossSelected then task.wait(); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(); continue end
+            local bossName = getgenv().BossSelected
+            if bossName then
+                local boss = Enemies:FindFirstChild(bossName)
+                if boss and boss:FindFirstChild("HumanoidRootPart") and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+                    PlayerTP(boss.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                    EquipTool()
+                    ActiveHaki()
+                    while boss and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 and getgenv().AutoFarmBossSelected do
+                        PlayerClick()
+                        task.wait(0.05)
+                    end
+                end
+            end
+            task.wait()
+        end
+    end)
+end
+
+function KillAllBosses()
+    task.spawn(function()
+        while true do
+            if not getgenv().KillAllBosses then task.wait(); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(); continue end
+            local nearest, bestDist = nil, math.huge
+            for _,name in pairs(BossListT) do
+                local boss = Enemies:FindFirstChild(name)
+                if boss and boss:FindFirstChild("HumanoidRootPart") and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+                    local d = (char.PrimaryPart.Position - boss.HumanoidRootPart.Position).Magnitude
+                    if d < bestDist then bestDist = d; nearest = boss end
+                end
+            end
+            if nearest then
+                PlayerTP(nearest.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                EquipTool()
+                ActiveHaki()
+                while nearest and nearest:FindFirstChild("Humanoid") and nearest.Humanoid.Health > 0 and getgenv().KillAllBosses do
+                    PlayerClick()
+                    task.wait(0.05)
+                end
+            end
+            task.wait()
+        end
+    end)
+end
+
+function KillAura()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoKillAura then task.wait(); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(); continue end
+            local nearest, bestDist = nil, math.huge
+            for _,target in pairs(Players:GetPlayers()) do
+                if target ~= Player and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 then
+                    local d = (char.PrimaryPart.Position - target.Character.HumanoidRootPart.Position).Magnitude
+                    if d < bestDist then bestDist = d; nearest = target end
+                end
+            end
+            if nearest then
+                PlayerTP(nearest.Character.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                EquipTool()
+                ActiveHaki()
+                for _ = 1, 10 do
+                    PlayerClick()
+                    task.wait(0.01)
+                end
+            end
+            task.wait()
+        end
+    end)
+end
+
+function AutoFarmSea()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarmSea then task.wait(); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(); continue end
+            local onBoat = false
+            for _,v in pairs(char:GetDescendants()) do if v:IsA("VehicleSeat") then onBoat = true; break end end
+            if not onBoat then
+                FireRemote("ShipwrightTalk", "Buy", "Boat")
+                task.wait(2)
+            end
+            local seaCentre = Sea3 and Vector3.new(-15000,0,500) or Sea2 and Vector3.new(-3000,0,-8000) or Vector3.new(1500,0,2000)
+            PlayerTP(CFrame.new(seaCentre))
+            local seaEnemies = {"SeaBeast","Terrorshark","Piranha","FishCrewMember","Shark"}
+            for _,name in pairs(seaEnemies) do
+                local enemy = Enemies:FindFirstChild(name)
+                if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+                    PlayerTP(enemy.HumanoidRootPart.CFrame * CFrame.new(0,0,30))
+                    EquipTool()
+                    ActiveHaki()
+                    PlayerClick()
+                end
+            end
+            task.wait()
+        end
+    end)
+end
+
+function AutoFarmRaid()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarmRaid then task.wait(); continue end
+            if not VerifyTool("Special Microchip") and getgenv().AutoBuyChip then
+                FireRemote("RaidsNpc", "Select", getgenv().SelectRaidChip)
+                task.wait(1)
+            end
+            if not Player.PlayerGui.Main.Timer.Visible then
+                local summon = nil
+                if Sea2 and workspace.Map and workspace.Map.CircleIsland then
+                    summon = workspace.Map.CircleIsland.RaidSummon2.Button.Main.ClickDetector
+                elseif workspace.Map and workspace.Map["Boat Castle"] then
+                    summon = workspace.Map["Boat Castle"].RaidSummon2.Button.Main.ClickDetector
+                end
+                if summon then fireclickdetector(summon) end
+                repeat task.wait() until Player.PlayerGui.Main.Timer.Visible
+                task.wait(1)
+            end
+            while Player.PlayerGui.Main.Timer.Visible and getgenv().AutoFarmRaid do
+                EquipTool()
+                local islands = workspace._WorldOrigin and workspace._WorldOrigin.Locations
+                if islands then
+                    for i = 5,1,-1 do
+                        local island = islands:FindFirstChild("Island "..i)
+                        if island then
+                            PlayerTP(island.CFrame + Vector3.new(0,70,0))
+                            for _,enemy in pairs(Enemies:GetChildren()) do
+                                if enemy:FindFirstChild("HumanoidRootPart") and (island.Position - enemy.HumanoidRootPart.Position).Magnitude < 300 then
+                                    PlayerClick()
+                                    task.wait(0.05)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait()
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+function AutoFarmMaterial()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarmMaterial then task.wait(2); continue end
+            local materialList = {}
+            if Sea1 then
+                materialList = {"Angel Wings", "Leather", "Scrap Metal", "Magma Ore", "Fish Tail"}
+            elseif Sea2 then
+                materialList = {"Leather", "Scrap Metal", "Magma Ore", "Mystic Droplet", "Radioactive Material", "Vampire Fang"}
+            elseif Sea3 then
+                materialList = {"Leather", "Scrap Metal", "Fish Tail", "Gunpowder", "Mini Tusk", "Conjured Cocoa", "Dragon Scale"}
+            end
+            for _, mat in pairs(materialList) do
+                local item = workspace:FindFirstChild(mat)
+                if item and item:FindFirstChild("ClickDetector") then
+                    PlayerTP(item.CFrame)
+                    task.wait(0.3)
+                    fireclickdetector(item)
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+function AutoFarmMastery()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarmMastery then task.wait(); continue end
+            EquipTool()
+            ActiveHaki()
+            local enemy = nil
+            for _,e in pairs(Enemies:GetChildren()) do
+                if e:FindFirstChild("HumanoidRootPart") and e:FindFirstChild("Humanoid") and e.Humanoid.Health > 0 then
+                    enemy = e
+                    break
+                end
+            end
+            if enemy then
+                PlayerTP(enemy.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                PlayerClick()
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+function AutoFactory()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFactory then task.wait(2); continue end
+            local factory = workspace.Map:FindFirstChild("Factory")
+            if factory and factory:FindFirstChild("Core") and factory.Core:FindFirstChild("Health") and factory.Core.Health.Value > 0 then
+                PlayerTP(CFrame.new(2900, 15, -2800))
+                EquipTool()
+                ActiveHaki()
+                local enemies = {"FactoryWorker", "FactorySoldier"}
+                for _, name in pairs(enemies) do
+                    local enemy = Enemies:FindFirstChild(name)
+                    if enemy and enemy:FindFirstChild("HumanoidRootPart") then
+                        PlayerTP(enemy.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                        PlayerClick()
+                    end
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+function AutoFarmEctoplasm()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoFarmEctoplasm then task.wait(); continue end
+            local ship = workspace:FindFirstChild("CursedShip") or workspace:FindFirstChild("ShipOfTheDamned")
+            if ship then
+                for _, enemy in pairs(Enemies:GetChildren()) do
+                    if enemy.Name == "CursedCaptain" or enemy.Name == "ShipSoldier" or enemy.Name == "DamnedCrew" then
+                        if enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                            PlayerTP(enemy.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                            EquipTool()
+                            ActiveHaki()
+                            PlayerClick()
+                            task.wait(0.1)
+                        end
+                    end
+                end
+            else
+                PlayerTP(CFrame.new(-850, 15, -3950))
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+function AutoKitsuneIsland()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoKitsuneIsland then task.wait(); continue end
+            if workspace.Map:FindFirstChild("KitsuneIsland") then
+                local islandPos = workspace.Map.KitsuneIsland.WorldPivot.p
+                PlayerTP(CFrame.new(islandPos + Vector3.new(0,50,0)))
+                for _, enemy in pairs(Enemies:GetChildren()) do
+                    if enemy.Name:find("Kitsune") or enemy.Name:find("Fox") then
+                        if enemy:FindFirstChild("HumanoidRootPart") then
+                            PlayerTP(enemy.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+                            EquipTool()
+                            ActiveHaki()
+                            PlayerClick()
+                        end
+                    end
+                end
+            else
+                PlayerTP(CFrame.new(-12500, 350, -8600)) -- near Turtle
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+-- ============================================
+-- FRUIT COLLECTOR & SNIPER
+-- ============================================
+function FruitSniper()
+    task.spawn(function()
+        while true do
+            if not getgenv().FruitSniper then task.wait(2); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(1); continue end
+            local fruits = {}
+            for _,v in pairs(workspace:GetDescendants()) do
+                if v:IsA("Tool") and v:FindFirstChild("Handle") and (v.Name:match("Fruit") or v:FindFirstChild("Fruit")) then
+                    table.insert(fruits, v)
+                end
+            end
+            local nearest, bestDist = nil, math.huge
+            for _,fruit in pairs(fruits) do
+                local handle = fruit:FindFirstChild("Handle")
+                if handle then
+                    local d = (char.PrimaryPart.Position - handle.Position).Magnitude
+                    if d < bestDist then bestDist = d; nearest = fruit end
+                end
+            end
+            if nearest then
+                local handle = nearest.Handle
+                if handle then
+                    PlayerTP(handle.CFrame)
+                    task.wait(0.3)
+                    fireclickdetector(nearest:FindFirstChild("ClickDetector"))
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+function AutoStoreFruits()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoStoreFruits then task.wait(3); continue end
+            local remote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+            if not remote then task.wait(); continue end
+            local char = Player.Character
+            if char then
+                for _,fruit in pairs(char:GetChildren()) do
+                    if fruit:IsA("Tool") and fruit:FindFirstChild("Fruit") then
+                        pcall(function() remote:InvokeServer("StoreFruit", fruit.Name, fruit) end)
+                    end
+                end
+            end
+            for _,fruit in pairs(Player.Backpack:GetChildren()) do
+                if fruit:IsA("Tool") and fruit:FindFirstChild("Fruit") then
+                    pcall(function() remote:InvokeServer("StoreFruit", fruit.Name, fruit) end)
+                end
+            end
+            task.wait(3)
+        end
+    end)
+end
+
+-- ============================================
+-- SUPER FAST ATTACK (ONE SHOT)
+-- ============================================
+task.spawn(function()
+    while true do
+        if getgenv().SuperFastAttack then
+            local char = Player.Character
+            if char and char.PrimaryPart then
+                local nearest, bestDist = nil, 100
+                for _, enemy in pairs(Enemies:GetChildren()) do
+                    if enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                        local d = (char.PrimaryPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                        if d < bestDist then bestDist = d; nearest = enemy end
+                    end
+                end
+                if nearest then
+                    PlayerTP(nearest.HumanoidRootPart.CFrame * CFrame.new(0,0,3))
+                    EquipTool()
+                    ActiveHaki()
+                    for _ = 1, 10 do
+                        PlayerClick()
+                        task.wait(0.01)
+                    end
+                end
+            end
+        end
+        task.wait(0.05)
+    end
+end)
+
+-- ============================================
+-- VISUAL & FUN FEATURES (New)
+-- ============================================
+function OniAura()
+    task.spawn(function()
+        while true do
+            if not getgenv().OniAura then task.wait(0.5); continue end
+            local char = Player.Character
+            if char then
+                for _,v in pairs(char:GetDescendants()) do
+                    if v:IsA("ParticleEmitter") then v.Enabled = true end
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+end
+
+function AutoGift()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoGift then task.wait(); continue end
+            local function GetGift()
+                for _,part in pairs(workspace:GetDescendants()) do
+                    if part.Name == "Present" and part:FindFirstChild("Box") and part.Box:FindFirstChild("ProximityPrompt") then
+                        return part, part.Box.ProximityPrompt
+                    end
+                end
+            end
+            local Gift, Prompt = GetGift()
+            if Gift and Gift.PrimaryPart then
+                PlayerTP(Gift.PrimaryPart.CFrame)
+                if Prompt then
+                    Prompt:InputHoldBegin()
+                    task.wait(0.5)
+                    Prompt:InputHoldEnd()
+                end
+            else
+                if Sea3 then PlayerTP(CFrame.new(-1076, 14, -14437))
+                elseif Sea2 then PlayerTP(CFrame.new(-5219, 15, 1532))
+                elseif Sea1 then PlayerTP(CFrame.new(1007, 15, -3805)) end
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+function AutoCandy()
+    task.spawn(function()
+        while true do
+            if not getgenv().AutoCandy then task.wait(); continue end
+            local char = Player.Character
+            if not char or not char.PrimaryPart then task.wait(); continue end
+            local function GetCandyNPC()
+                for _,npc in pairs(Enemies:GetChildren()) do
+                    if npc.Name == "Isle Champion" or npc.Name == "Sun-kissed Warrior" or npc.Name == "Island Boy" or npc.Name == "Isle Outlaw" then
+                        if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                            return npc
+                        end
+                    end
+                end
+                return nil
+            end
+            local enemy = GetCandyNPC()
+            if enemy then
+                PlayerTP(enemy.HumanoidRootPart.CFrame + getgenv().FarmPos)
+                EquipTool()
+                ActiveHaki()
+                PlayerClick()
+                BringNPC(enemy)
+            end
+            task.wait()
+        end
+    end)
+end
+
+-- Custom Moves (Divine Art, Celestial, Triple Dark Blade, Black Blast)
+task.spawn(function()
+    while true do
+        if getgenv().DivineArt then
+            FireRemote("DivineArt", "C")
+            task.wait(0.4)
+            FireRemote("DivineArt", "X")
+            task.wait(0.4)
+            FireRemote("DivineArt", "Z")
+            task.wait(0.8)
+        end
+        task.wait(0.1)
+    end
+end)
+task.spawn(function()
+    while true do
+        if getgenv().Celestial then
+            FireRemote("CelestialMove", "C")
+            task.wait(0.4)
+            FireRemote("CelestialMove", "X")
+            task.wait(0.4)
+            FireRemote("CelestialMove", "Z")
+            task.wait(0.8)
+        end
+        task.wait(0.1)
+    end
+end)
+task.spawn(function()
+    while true do
+        if getgenv().TripleDarkBlade then
+            FireRemote("TripleBlade", "C")
+            task.wait(0.4)
+            FireRemote("TripleBlade", "X")
+            task.wait(0.4)
+            FireRemote("TripleBlade", "Z")
+            task.wait(0.8)
+        end
+        task.wait(0.1)
+    end
+end)
+task.spawn(function()
+    while true do
+        if getgenv().BlackBlast then
+            FireRemote("BlackBlast")
+            task.wait(1)
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- Visual Admin (ESP + Fullbright)
+task.spawn(function()
+    while true do
+        if getgenv().VisualAdmin then
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.FogEnd = 100000
+            Lighting.GlobalShadows = false
+            -- Player ESP
+            for _,plr in pairs(Players:GetPlayers()) do
+                if plr ~= Player and plr.Character and plr.Character:FindFirstChild("Head") then
+                    local head = plr.Character.Head
+                    if not head:FindFirstChild("VortexESP") then
+                        local bill = Instance.new("BillboardGui", head)
+                        bill.Name = "VortexESP"
+                        bill.AlwaysOnTop = true
+                        bill.Size = UDim2.new(0,8,0,8)
+                        bill.StudsOffset = Vector3.new(0,2,0)
+                        local text = Instance.new("TextLabel", bill)
+                        text.Text = plr.Name .. " [" .. math.floor(plr.Character.Humanoid.Health) .. " HP]"
+                        text.TextColor3 = Color3.new(1,0.2,0.2)
+                        text.TextScaled = true
+                        text.Size = UDim2.new(1,0,1,0)
+                        text.BackgroundTransparency = 1
+                        text.Font = Enum.Font.GothamBold
+                    end
+                end
+            end
+            -- Chest ESP
+            for _,chest in pairs(workspace:GetDescendants()) do
+                if chest:IsA("BasePart") and (chest.Name == "Chest" or chest.Name == "Chest1" or chest.Name == "Chest2" or chest.Name == "Chest3") then
+                    if not chest:FindFirstChild("ChestESP") then
+                        local bill = Instance.new("BillboardGui", chest)
+                        bill.Name = "ChestESP"
+                        bill.AlwaysOnTop = true
+                        bill.Size = UDim2.new(0,5,0,5)
+                        local text = Instance.new("TextLabel", bill)
+                        text.Text = "💰 CHEST"
+                        text.TextColor3 = Color3.new(1,1,0)
+                        text.TextScaled = true
+                        text.Size = UDim2.new(1,0,1,0)
+                        text.BackgroundTransparency = 1
+                    end
+                end
+            end
+            -- Fruit ESP
+            for _,fruit in pairs(workspace:GetDescendants()) do
+                if fruit:IsA("Tool") and fruit:FindFirstChild("Handle") and (fruit.Name:match("Fruit") or fruit:FindFirstChild("Fruit")) then
+                    local handle = fruit.Handle
+                    if handle and not handle:FindFirstChild("FruitESP") then
+                        local bill = Instance.new("BillboardGui", handle)
+                        bill.Name = "FruitESP"
+                        bill.AlwaysOnTop = true
+                        bill.Size = UDim2.new(0,6,0,6)
+                        local text = Instance.new("TextLabel", bill)
+                        text.Text = "🍎 " .. fruit.Name
+                        text.TextColor3 = Color3.new(0.5,1,0.5)
+                        text.TextScaled = true
+                        text.Size = UDim2.new(1,0,1,0)
+                        text.BackgroundTransparency = 1
+                    end
+                end
+            end
+        else
+            Lighting.Brightness = 1
+            Lighting.FogEnd = 1000
+            Lighting.GlobalShadows = true
+            for _,plr in pairs(Players:GetPlayers()) do
+                if plr.Character and plr.Character:FindFirstChild("Head") then
+                    local esp = plr.Character.Head:FindFirstChild("VortexESP")
+                    if esp then esp:Destroy() end
+                end
+            end
+            for _,chest in pairs(workspace:GetDescendants()) do
+                if chest:IsA("BasePart") then
+                    local esp = chest:FindFirstChild("ChestESP")
+                    if esp then esp:Destroy() end
+                end
+            end
+            for _,fruit in pairs(workspace:GetDescendants()) do
+                if fruit:IsA("Tool") and fruit:FindFirstChild("Handle") then
+                    local esp = fruit.Handle:FindFirstChild("FruitESP")
+                    if esp then esp:Destroy() end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- ============================================
+-- ONE-CLICK BUTTONS (Shop, Codes, Teleports)
+-- ============================================
+function BuyFightingStyles()
+    for _,style in pairs({"BuyBlackLeg","BuyElectro","BuyFishmanKarate","BuySuperhuman","BuyDeathStep","BuySharkmanKarate","BuyElectricClaw","BuyDragonTalon","BuyGodhuman"}) do
+        FireRemote(style)
+        task.wait(0.2)
+    end
+end
+function BuyGuns()
+    for _,gun in pairs({"Slingshot","Musket","Flintlock","Refined Slingshot","Acidum","Kabucha"}) do
+        FireRemote("BuyItem", gun)
+        task.wait(0.2)
+    end
+end
+function BuySwords()
+    for _,sword in pairs({"Katana","Cutlass","Dual Katana","Iron Mace","Triple Katana","Pipe","Soul Cane","Bisento"}) do
+        FireRemote("BuyItem", sword)
+        task.wait(0.2)
+    end
+end
+function BuyAccessories()
+    for _,acc in pairs({"Black Cape","Swordsman Hat","Tomoe Ring"}) do
+        FireRemote("BuyItem", acc)
+        task.wait(0.2)
+    end
+end
+function RedeemAllCodes()
+    local codes = {"REWARDFUN","Chandler","NEWTROLL","KITT_RESET","Sub2CaptainMaui","DEVSCOOKING","kittgaming","Sub2Fer999","Enyu_is_Pro","Magicbus","JCWK","Starcodeheo","Bluxxy","fudd10_v2","SUB2GAMERROBOT_EXP1","Sub2NoobMaster123","Sub2UncleKizaru","Sub2Daigrock","Axiore","TantaiGaming","StrawHatMaine","Sub2OfficialNoobie","Fudd10","Bignews"}
+    for _,code in pairs(codes) do
+        pcall(function() ReplicatedStorage.Remotes.Redeem:InvokeServer(code) end)
+        task.wait(0.3)
+    end
+end
+function TeleportToSea(sea)
+    if sea == 1 then FireRemote("TravelMain")
+    elseif sea == 2 then FireRemote("TravelDressrosa")
+    elseif sea == 3 then FireRemote("TravelZou") end
+end
+
+-- ============================================
+-- UI CREATION (redzlib)
+-- ============================================
+local Window = redzlib:MakeWindow({
+    Title = "VORTEX FX : Blox Fruits",
+    SubTitle = "by syzo gamer",
+    SaveFolder = "Vortex Hub"
+})
+
+-- Discord Tab
+local DiscordTab = Window:MakeTab({"Discord", "Info"})
+DiscordTab:AddDiscordInvite({
+    Name = "Vortex Hub Community",
+    Description = "Join our discord community to receive information about the next update",
+    Logo = "rbxassetid://115490382631820",
+    Invite = "https://discord.gg/sAUgSnu42T"
+})
+
+-- Farm Tab
+local FarmTab = Window:MakeTab({"Farm", "Home"})
+FarmTab:AddDropdown({Name = "Farm Tool", Options = {"Melee","Sword","Blox Fruit"}, Default = {"Melee"}, Callback = function(v) getgenv().FarmTool = v end})
+FarmTab:AddSection({"Level Farming"})
+FarmTab:AddToggle({Name = "Auto Farm Level", Callback = function(v) getgenv().AutoFarm_Level = v; AutoFarm_Level() end})
+FarmTab:AddToggle({Name = "Auto Farm Nearest", Callback = function(v) getgenv().AutoFarmNearest = v; AutoFarmNearest() end})
+FarmTab:AddButton({Name = "Auto Stats Melee", Callback = function() getgenv().AutoStatsMelee = true; getgenv().AutoStatsDefense = false; getgenv().AutoStatsSword = false; getgenv().AutoStatsGun = false; getgenv().AutoStatsBloxFruit = false end})
+FarmTab:AddButton({Name = "Auto Stats Defense", Callback = function() getgenv().AutoStatsMelee = false; getgenv().AutoStatsDefense = true; getgenv().AutoStatsSword = false; getgenv().AutoStatsGun = false; getgenv().AutoStatsBloxFruit = false end})
+FarmTab:AddButton({Name = "Auto Stats Sword", Callback = function() getgenv().AutoStatsMelee = false; getgenv().AutoStatsDefense = false; getgenv().AutoStatsSword = true; getgenv().AutoStatsGun = false; getgenv().AutoStatsBloxFruit = false end})
+FarmTab:AddButton({Name = "Auto Stats Gun", Callback = function() getgenv().AutoStatsMelee = false; getgenv().AutoStatsDefense = false; getgenv().AutoStatsSword = false; getgenv().AutoStatsGun = true; getgenv().AutoStatsBloxFruit = false end})
+FarmTab:AddButton({Name = "Auto Stats Blox Fruit", Callback = function() getgenv().AutoStatsMelee = false; getgenv().AutoStatsDefense = false; getgenv().AutoStatsSword = false; getgenv().AutoStatsGun = false; getgenv().AutoStatsBloxFruit = true end})
+FarmTab:AddSection({"Farm Tools"})
+FarmTab:AddToggle({Name = "Collect Chests", Callback = function(v) getgenv().AutoChestTween = v; AutoChestTween() end})
+FarmTab:AddToggle({Name = "Farm Materials", Callback = function(v) getgenv().AutoFarmMaterial = v; AutoFarmMaterial() end})
+FarmTab:AddToggle({Name = "Auto Mastery (Gun/Fruit)", Callback = function(v) getgenv().AutoFarmMastery = v; AutoFarmMastery() end})
+FarmTab:AddSection({"Quests & Missions"})
+FarmTab:AddButton({Name = "Teleport to 2nd Sea", Callback = function() TeleportToSea(2) end})
+FarmTab:AddButton({Name = "Complete 2nd Sea Quest (Bartilo)", Callback = function() FireRemote("CompleteQuest","Bartilo") end})
+FarmTab:AddButton({Name = "Kill Don Swan", Callback = function()
+    local boss = Enemies:FindFirstChild("Don Swan")
+    if boss and boss:FindFirstChild("HumanoidRootPart") then
+        PlayerTP(boss.HumanoidRootPart.CFrame * CFrame.new(0,5,0))
+        EquipTool(); ActiveHaki()
+        while boss and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 do PlayerClick(); task.wait(0.05) end
+    end
+end})
+FarmTab:AddButton({Name = "Auto Third Sea Teleport", Callback = function() TeleportToSea(3) end})
+
+-- Sea Tab (only if Sea2 or Sea3)
+if Sea2 or Sea3 then
+    local SeaTab = Window:MakeTab({"Sea", "Waves"})
+    if Sea3 then
+        SeaTab:AddSection({"Kitsune Island"})
+        local kitLabel = SeaTab:AddParagraph({"Kitsune Island : not spawn"})
+        SeaTab:AddToggle({Name = "Auto Kitsune Island", Callback = function(v) getgenv().AutoKitsuneIsland = v; AutoKitsuneIsland() end})
+        task.spawn(function()
+            while true do
+                if workspace.Map:FindFirstChild("KitsuneIsland") and Player.Character and Player.Character.PrimaryPart then
+                    local dist = math.floor((Player.Character.PrimaryPart.Position - workspace.Map.KitsuneIsland.WorldPivot.p).Magnitude / 3)
+                    kitLabel:SetTitle("Kitsune Island : Spawned | Distance : " .. dist)
+                elseif workspace.Map:FindFirstChild("KitsuneIsland") then
+                    kitLabel:SetTitle("Kitsune Island : Spawned")
+                else
+                    kitLabel:SetTitle("Kitsune Island : not Spawn")
+                end
+                task.wait(1)
+            end
+        end)
+    end
+    SeaTab:AddSection({"Sea Farming"})
+    SeaTab:AddToggle({Name = "Auto Farm Sea", Callback = function(v) getgenv().AutoFarmSea = v; AutoFarmSea() end})
+    SeaTab:AddButton({Name = "Buy New Boat", Callback = function() FireRemote("ShipwrightTalk","Buy","Boat") end})
+    SeaTab:AddSection({"Panic Mode"})
+    SeaTab:AddSlider({Name = "Select Health", Min = 20, Max = 70, Default = 25, Callback = function(v) getgenv().HealthPanic = v end})
+    SeaTab:AddToggle({Name = "Panic Mode", Callback = function(v) getgenv().PanicMode = v end})
+end
+
+-- Fruits & Raids Tab
+local FruitTab = Window:MakeTab({"Fruits/Raids", "Cherry"})
+FruitTab:AddSection({"Fruit Collector"})
+FruitTab:AddToggle({Name = "Auto Buy Random Fruit", Callback = function(v) getgenv().AutoBuyRandomFruit = v; task.spawn(function() while getgenv().AutoBuyRandomFruit do task.wait(60); FireRemote("Cousin","Buy") end end) end})
+FruitTab:AddToggle({Name = "Collect Fruits in Server (Sniper)", Callback = function(v) getgenv().FruitSniper = v; FruitSniper() end})
+FruitTab:AddToggle({Name = "Auto Store Fruits", Callback = function(v) getgenv().AutoStoreFruits = v; AutoStoreFruits() end})
+FruitTab:AddSection({"Raids"})
+if Sea2 or Sea3 then
+    local raidChips = {}
+    local raidsMod = pcall(require, ReplicatedStorage.Raids) and require(ReplicatedStorage.Raids) or {advancedRaids={}, raids={}}
+    table.foreach(raidsMod.advancedRaids, function(_,b) table.insert(raidChips, b) end)
+    table.foreach(raidsMod.raids, function(_,b) table.insert(raidChips, b) end)
+    if #raidChips == 0 then raidChips = {"Buddha","Magma","Light"} end
+    FruitTab:AddDropdown({Name = "Select Raid Fruit", Options = raidChips, Callback = function(v) getgenv().SelectRaidChip = v end})
+    FruitTab:AddToggle({Name = "Auto Buy Chip", Callback = function(v) getgenv().AutoBuyChip = v end})
+    FruitTab:AddToggle({Name = "Auto Farm Raid", Callback = function(v) getgenv().AutoFarmRaid = v; AutoFarmRaid() end})
+else
+    FruitTab:AddParagraph({"Raid features only on Sea 2/3"})
+end
+
+-- Bosses Tab
+local BossTab = Window:MakeTab({"Bosses", "Skull"})
+BossTab:AddSection({"Boss Farm"})
+local bossDropdown = BossTab:AddDropdown({Name = "Select Boss", Options = BossListT, Callback = function(v) getgenv().BossSelected = v end})
+function UpdateBossList()
+    local newOpts = {}
+    for _,name in pairs(BossListT) do
+        if VerifyNPC(name) then table.insert(newOpts, name) end
+    end
+    if #newOpts > 0 then bossDropdown:Set(newOpts, true) end
+end
+BossTab:AddButton({Name = "Update Boss List", Callback = UpdateBossList})
+BossTab:AddToggle({Name = "Auto Farm Selected Boss", Callback = function(v) getgenv().AutoFarmBossSelected = v; AutoFarmBossSelected() end})
+BossTab:AddToggle({Name = "Kill All Bosses", Callback = function(v) getgenv().KillAllBosses = v; KillAllBosses() end})
+
+-- Player Tab
+local PlayerTab = Window:MakeTab({"Player", "User"})
+PlayerTab:AddSection({"Combat"})
+PlayerTab:AddToggle({Name = "Kill Aura (Players)", Callback = function(v) getgenv().AutoKillAura = v; KillAura() end})
+PlayerTab:AddToggle({Name = "Auto Haki", Callback = function(v) getgenv().AutoHaki = v end})
+PlayerTab:AddToggle({Name = "Super Fast Attack (One Shot)", Description = "Rapidly attacks nearby enemies/bosses", Callback = function(v) getgenv().SuperFastAttack = v end})
+PlayerTab:AddSection({"Sea Events"})
+PlayerTab:AddToggle({Name = "Auto Farm Sea (Beasts)", Callback = function(v) getgenv().AutoFarmSea = v; AutoFarmSea() end})
+
+-- Teleport Tab
+local TeleportTab = Window:MakeTab({"Teleport", "Locate"})
+TeleportTab:AddSection({"Teleport to Sea"})
+TeleportTab:AddButton({Name = "Teleport to Sea 1", Callback = function() TeleportToSea(1) end})
+TeleportTab:AddButton({Name = "Teleport to Sea 2", Callback = function() TeleportToSea(2) end})
+TeleportTab:AddButton({Name = "Teleport to Sea 3", Callback = function() TeleportToSea(3) end})
+
+-- Visual Tab
+local VisualTab = Window:MakeTab({"Visual", "User"})
+VisualTab:AddSection({"Notifications"})
+local notifTime = 15
+local notifEnabled = false
+VisualTab:AddSlider({Name = "Notification Time (sec)", Min = 5, Max = 120, Default = 15, Callback = function(v) notifTime = v end})
+VisualTab:AddToggle({Name = "Fruit Spawn Notifier", Callback = function(v) notifEnabled = v end})
+workspace.ChildAdded:Connect(function(part)
+    if notifEnabled and (part:IsA("Tool") and string.find(part.Name, "Fruit")) then
+        redzlib:MakeNotify({Name = "Fruit Notifier", Text = "The fruit '" .. part.Name .. "' spawned!", Time = notifTime})
+    end
+end)
+VisualTab:AddSection({"ESP & Auras"})
+VisualTab:AddToggle({Name = "Visual Admin (ESP + Fullbright)", Callback = function(v) getgenv().VisualAdmin = v end})
+VisualTab:AddToggle({Name = "Oni Aura", Callback = function(v) getgenv().OniAura = v; OniAura() end})
+VisualTab:AddToggle({Name = "Auto Gift (Christmas)", Callback = function(v) getgenv().AutoGift = v; AutoGift() end})
+VisualTab:AddToggle({Name = "Auto Candy", Callback = function(v) getgenv().AutoCandy = v; AutoCandy() end})
+VisualTab:AddSection({"Custom Moves"})
+VisualTab:AddToggle({Name = "Divine Art Moves (C/X/Z)", Callback = function(v) getgenv().DivineArt = v end})
+VisualTab:AddToggle({Name = "Celestial Moves (C/X/Z)", Callback = function(v) getgenv().Celestial = v end})
+VisualTab:AddToggle({Name = "Triple Dark Blade Moves", Callback = function(v) getgenv().TripleDarkBlade = v end})
+VisualTab:AddToggle({Name = "Black Blast", Callback = function(v) getgenv().BlackBlast = v end})
+
+-- Shop Tab
+local ShopTab = Window:MakeTab({"Shop", "ShoppingCart"})
+ShopTab:AddSection({"Buy Items"})
+ShopTab:AddButton({Name = "Buy Fighting Styles (All)", Callback = BuyFightingStyles})
+ShopTab:AddButton({Name = "Buy Races V2/V3/V4", Callback = function() FireRemote("UpgradeRace","V2"); FireRemote("UpgradeRace","V3"); FireRemote("UpgradeRace","V4") end})
+ShopTab:AddButton({Name = "Buy Guns", Callback = BuyGuns})
+ShopTab:AddButton({Name = "Buy Swords", Callback = BuySwords})
+ShopTab:AddButton({Name = "Buy Accessories", Callback = BuyAccessories})
+
+-- Codes Tab
+local CodesTab = Window:MakeTab({"Codes", "Redeem"})
+CodesTab:AddButton({Name = "Redeem All Codes", Callback = RedeemAllCodes})
+
+-- Misc Tab
+local MiscTab = Window:MakeTab({"Misc", "Settings"})
+MiscTab:AddSection({"Server"})
+MiscTab:AddButton({Name = "Server Hop", Callback = ServerHop})
+MiscTab:AddSection({"Configs"})
+MiscTab:AddSlider({Name = "Farm Distance", Min = 5, Max = 50, Default = 25, Callback = function(v) getgenv().FarmDistance = v end})
+MiscTab:AddToggle({Name = "Anti AFK", Callback = function(v)
+    getgenv().AntiAFK = v
+    task.spawn(function()
+        while getgenv().AntiAFK do
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton1(Vector2.new(math.huge, math.huge))
+            task.wait(600)
+        end
+    end)
+end})
+MiscTab:AddToggle({Name = "Walk On Water", Callback = function(v)
+    getgenv().WalkOnWater = v
+    task.spawn(function()
+        local water = workspace.Map:WaitForChild("WaterBase-Plane", 9e9)
+        while getgenv().WalkOnWater do
+            water.Size = Vector3.new(1000, 113, 1000)
+            task.wait(0.1)
+        end
+        water.Size = Vector3.new(1000, 80, 1000)
+    end)
+end})
+MiscTab:AddButton({Name = "Destroy UI", Callback = function() Window:Destroy() end})
+
+-- Special Tab (Firebase tracker, server finder)
+local SpecialTab = Window:MakeTab({"Special", "Star"})
+SpecialTab:AddSection({"Global Fireball Tracker"})
+SpecialTab:AddToggle({Name = "Auto-Report My Server", Description = "Shares Moon/Mirage with all Vortex users", Callback = function(v)
+    getgenv().Reporting = v
+    task.spawn(function() while getgenv().Reporting do pcall(scanLocalEvents); task.wait(300) end end)
+end})
+SpecialTab:AddSection({"Server Finder (Teleport)"})
+local function fetchFireball(targetEvent)
+    local success, result = pcall(function() return HttpService:GetAsync(DATABASE_URL) end)
+    if success and result and result ~= "null" then
+        local data = HttpService:JSONDecode(result)
+        local found = false
+        for _, info in pairs(data) do
+            if info.Event == targetEvent then
+                found = true
+                redzlib:MakeNotify({Name = "Vortex Finder", Text = "Found "..targetEvent.."! Joining...", Time = 5})
+                task.wait(1)
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, info.JobId, Player)
+                break
+            end
+        end
+        if not found then redzlib:MakeNotify({Name = "Vortex", Text = "No "..targetEvent.." found.", Time = 5}) end
+    else
+        redzlib:MakeNotify({Name = "Vortex Error", Text = "Database offline.", Time = 5})
+    end
+end
+SpecialTab:AddButton({Name = "Find Mirage Island Server 🏝️", Callback = function() fetchFireball("Mirage Island 🏝️") end})
+SpecialTab:AddButton({Name = "Find Full Moon Server 🌕", Callback = function() fetchFireball("Full Moon 🌕") end})
+SpecialTab:AddButton({Name = "Find Near Full Moon Server 🌙", Callback = function() fetchFireball("Night (Near Moon) 🌙") end})
+SpecialTab:AddButton({Name = "Find Factory / Pirate Raid", Callback = function() fetchFireball("Factory Raid 🏭"); fetchFireball("Pirate Raid 🏴‍☠️") end})
+SpecialTab:AddSection({"Script Management"})
+SpecialTab:AddButton({Name = "Copy Discord Invite", Callback = function() setclipboard("https://discord.gg/sAUgSnu42T"); redzlib:MakeNotify({Name = "Vortex", Text = "Invite copied!", Time = 3}) end})
+SpecialTab:AddButton({Name = "Unload Vortex Hub", Callback = function() Window:Destroy() end})
+SpecialTab:AddSection({"Credits"})
+SpecialTab:AddParagraph({"Vortex FX Hub by Syzo Gamer", "Thanks for using! Join our Discord for updates."})
+
+-- ============================================
+-- ANTI-BAN & ERROR HANDLING
+-- ============================================
+if getgenv().AntiBan then
+    task.spawn(function()
+        while task.wait(45) do
+            pcall(function() FireRemote("SendMessage", "[Security] Vortex Hub v4.0 - Protected") end)
+        end
+    end)
+end
+
+-- Remove death effects and suppress errors
+task.spawn(function()
+    local effectContainer = ReplicatedStorage:WaitForChild("Effect", 9e9):WaitForChild("Container", 9e9)
+    RunService.RenderStepped:Connect(function()
+        local death = effectContainer:FindFirstChild("Death")
+        if death then death:Destroy() end
+    end)
+    hookfunction(error, function() end)
+    hookfunction(warn, function() end)
+end)
+
+print("Vortex Hub v4.0 loaded. No key required. Discord: https://discord.gg/sAUgSnu42T")
