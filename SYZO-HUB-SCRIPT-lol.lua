@@ -11,7 +11,7 @@ local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 
 -- ═══ CONFIGURATION ═══
-local VALID_KEYS = { "syzo1234@++++c" }
+local VALID_KEYS = { "syzo1234@" }
 local KEY_SAVE_NAME = "SYZO_SavedKey.txt"
 local DISCORD_LINK = "https://discord.gg/sAUgSnu42T"
 
