@@ -13,13 +13,32 @@ local KEY_FILE = "SYZOHub_SavedKey.txt"
 -- ★★★ YOUR LIST OF GAME SCRIPTS (keep as many as you need) ★★★
 -- ============================================================
 local SCRIPTS = {
-    { Name = "+1 Wood per Click", URL = "https://raw.githubusercontent.com/.../1wood-per-click.lua", GameId = 112231208081788 },
-    { Name = "1 Keyboard = 1$/s", URL = "https://raw.githubusercontent.com/.../1keyboard%3D1%24s.lua", GameId = 121003786627094 },
-    { Name = "Anime Astral Simulator", URL = "https://raw.githubusercontent.com/.../anime-astral-simulator.lua", GameId = 113236157544232 },
-    -- ... add your other scripts here (up to 20 or more) ...
-    -- Example:
-    { Name = "Youtuber Card Collection", URL = "https://raw.githubusercontent.com/.../youtuber-card-collection.lua", GameId = 81440501385895 },
-}
+-- [ 1. BLOX FRUITS (Sea 1, Sea 2, and Sea 3) ] --
+if PlaceId == 2753915549 or PlaceId == 4442272183 or PlaceId == 7449423635 or PlaceId == 7447361652 then
+    print("Vortex FX: Blox Fruits Detected! Loading Hub...")
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/flazhy/QuantumOnyx/refs/heads/main/QuantumOnyx.lua"))()
+
+-- [ 2. ANIME CARD COLLECTION ] --
+elseif PlaceId == 76285745979410 then
+    print("Vortex FX: Anime Card Collection Detected! Loading Hub...")
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Vortex-FX-source/Vortex-Hub/refs/heads/main/VortexAnimeCardsCollection"))()
+
+
+-- [ 4. EVERY OTHER GAME (Universal Fly Script) ] --
+else
+    print("Vortex FX: Game not officially supported. Loading Universal Fly Script...")
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Vortex-FX-source/Vortex-Hub/refs/heads/main/VortexFlyScript"))()
+    
+    -- Optional: A quick notification so the user knows what happened
+    local StarterGui = game:GetService("StarterGui")
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "Vortex FX",
+            Text = "Game not supported. Loaded Universal Fly Script!",
+            Duration = 5
+        })
+    end)
+  end
 
 -- ============================================================
 -- ★★★ FALLBACK FLY SCRIPT (loads when no game matches) ★★★
