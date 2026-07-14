@@ -14,7 +14,7 @@ local KEY_FILE = "SYZOHub_SavedKey.txt"
 -- ============================================================
 local SCRIPTS = {
     -- 1
-    { Name = "Script 1", Icon = "", URL = "", GameId = "" },
+    { Name = "BLOX FRUIT QUENTEM ONEX", Icon = "💣", URL = "https://raw.githubusercontent.com/flazhy/QuantumOnyx/refs/heads/main/QuantumOnyx.lua", GameId = "2753915549" },
     -- 2
     { Name = "Script 2", Icon = "", URL = "", GameId = "" },
     -- 3
