@@ -363,7 +363,230 @@ local Content = new("Frame", {
     ZIndex = 4,
     Parent = Card
 })
+-- ============================================================
+-- 🧭 FLOATING INFO TAB (draggable, always on top)
+-- ============================================================
 
+-- 1. Create the floating button frame
+local InfoButton = new("Frame", {
+    Name = "InfoButton",
+    Size = UDim2.new(0, 160, 0, 40),
+    Position = UDim2.new(1, -180, 0, 10), -- top‑right corner
+    BackgroundColor3 = C.surface,
+    BackgroundTransparency = 0.1,
+    ZIndex = 30,  -- on top of everything
+    ClipsDescendants = true,
+    Parent = Gui   -- parent to the main GUI so it stays independent
+})
+corner(InfoButton, 20)
+stroke(InfoButton, C.accent, 1.5)
+
+-- 2. Player avatar (thumbnail)
+local Avatar = new("ImageLabel", {
+    Size = UDim2.new(0, 30, 0, 30),
+    Position = UDim2.new(0, 5, 0.5, -15),
+    BackgroundTransparency = 1,
+    Image = "http://www.roblox.com/thumbnail/?type=AvatarHeadshot&userId=" .. LocalPlayer.UserId .. "&width=100&height=100&format=png",
+    ZIndex = 31,
+    Parent = InfoButton
+})
+corner(Avatar, 15)
+
+-- 3. Username label
+local UserLabel = label({
+    Size = UDim2.new(1, -80, 1, 0),
+    Position = UDim2.new(0, 40, 0, 0),
+    Text = LocalPlayer.Name,
+    TextColor3 = C.textB,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    ZIndex = 31,
+    Parent = InfoButton
+})
+
+-- 4. Info icon
+local InfoIcon = new("TextLabel", {
+    Size = UDim2.new(0, 20, 0, 20),
+    Position = UDim2.new(1, -25, 0.5, -10),
+    BackgroundTransparency = 1,
+    Text = "ⓘ",
+    TextColor3 = C.accent,
+    TextSize = 16,
+    Font = Enum.Font.GothamBold,
+    ZIndex = 31,
+    Parent = InfoButton
+})
+
+-- 5. Hover effect
+InfoButton.MouseEnter:Connect(function()
+    tween(InfoButton, { BackgroundTransparency = 0, BackgroundColor3 = C.surfaceL }, 0.2)
+end)
+InfoButton.MouseLeave:Connect(function()
+    tween(InfoButton, { BackgroundTransparency = 0.1, BackgroundColor3 = C.surface }, 0.2)
+end)
+
+-- 6. Dragging logic for InfoButton
+local dragInfo = false
+local dragStartInfo, startPosInfo
+
+InfoButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragInfo = true
+        dragStartInfo = input.Position
+        startPosInfo = InfoButton.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragInfo = false
+            end
+        end)
+    end
+end)
+
+InfoButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        -- we'll track in UserInputService
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == UserInputService:GetLastInput() and dragInfo then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStartInfo
+            InfoButton.Position = UDim2.new(startPosInfo.X.Scale, startPosInfo.X.Offset + delta.X, startPosInfo.Y.Scale, startPosInfo.Y.Offset + delta.Y)
+        end
+    end
+end)
+
+-- 7. Info Popup (hidden by default)
+local InfoPopup = new("Frame", {
+    Name = "InfoPopup",
+    Size = UDim2.new(0, 400, 0, 300),
+    Position = UDim2.new(0.5, -200, 0.5, -150),
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    BackgroundColor3 = C.bg,
+    BackgroundTransparency = 1,  -- start invisible
+    Visible = false,
+    ZIndex = 40,
+    ClipsDescendants = true,
+    Parent = Gui
+})
+corner(InfoPopup, 16)
+stroke(InfoPopup, C.border, 1)
+
+-- Popup background (fade in)
+local PopupBackdrop = new("Frame", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundColor3 = C.black,
+    BackgroundTransparency = 0.6,
+    ZIndex = 39,
+    Visible = false,
+    Parent = Gui
+})
+
+-- Popup header
+local PopupHeader = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 44),
+    BackgroundColor3 = C.accent,
+    BorderSizePixel = 0,
+    ZIndex = 41,
+    Parent = InfoPopup
+})
+corner(PopupHeader, 16) -- only top corners will be rounded? we'll just use a separate frame
+
+label({
+    Size = UDim2.new(1, -40, 1, 0),
+    Position = UDim2.new(0, 20, 0, 0),
+    Text = "ℹ️ About SYZO PEAK HUB",
+    TextColor3 = C.textB,
+    TextSize = 16,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+    ZIndex = 42,
+    Parent = PopupHeader
+})
+
+-- Close button for popup
+local PopupClose = new("TextButton", {
+    Size = UDim2.new(0, 30, 0, 30),
+    Position = UDim2.new(1, -40, 0.5, -15),
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+    BackgroundTransparency = 0.9,
+    Text = "✕",
+    TextColor3 = C.text,
+    TextSize = 16,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+    ZIndex = 42,
+    Parent = PopupHeader
+})
+corner(PopupClose, 8)
+PopupClose.MouseButton1Click:Connect(function()
+    tween(InfoPopup, { BackgroundTransparency = 1 }, 0.3)
+    tween(PopupBackdrop, { BackgroundTransparency = 1 }, 0.3)
+    task.wait(0.3)
+    InfoPopup.Visible = false
+    PopupBackdrop.Visible = false
+end)
+
+-- Popup content (scrollable would be nice, but we'll keep simple)
+local PopupContent = new("ScrollingFrame", {
+    Size = UDim2.new(1, -20, 1, -60),
+    Position = UDim2.new(0, 10, 0, 50),
+    BackgroundTransparency = 1,
+    CanvasSize = UDim2.new(0, 0, 0, 400), -- enough space
+    ScrollBarThickness = 6,
+    ZIndex = 41,
+    Parent = InfoPopup
+})
+
+-- Developer credits
+local creditText = [[
+🎯 SYZO PEAK HUB – Loader v3.0
+
+Developers:
+• SYZO (Main Dev)
+• Contributors: (list them)
+
+Script Sources:
+This loader aggregates scripts from multiple trusted developers.
+All scripts are auto‑updated when the original owners push updates.
+
+📌 Discord: https://discord.gg/sAUgSnu42T
+
+Thanks for using SYZO PEAK HUB!
+]]
+
+label({
+    Size = UDim2.new(1, 0, 0, 280),
+    BackgroundTransparency = 1,
+    Text = creditText,
+    TextColor3 = C.text,
+    TextSize = 13,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    TextWrapped = true,
+    ZIndex = 42,
+    Parent = PopupContent
+})
+
+-- 8. Click on InfoButton toggles popup
+InfoButton.MouseButton1Click:Connect(function()
+    PopupBackdrop.Visible = true
+    PopupBackdrop.BackgroundTransparency = 0.6
+    tween(PopupBackdrop, { BackgroundTransparency = 0.6 }, 0.2)
+
+    InfoPopup.Visible = true
+    InfoPopup.BackgroundTransparency = 0
+    tween(InfoPopup, { BackgroundTransparency = 0 }, 0.2)
+end)
+
+-- ============================================================
+-- END OF FLOATING INFO TAB
+-- ============================================================
 local function closeThenLaunch(url)
     tween(Card, { Size = UDim2.new(0, CW, 0, 0), BackgroundTransparency = 1 }, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
     tween(Backdrop, { BackgroundTransparency = 1 }, 0.4)
