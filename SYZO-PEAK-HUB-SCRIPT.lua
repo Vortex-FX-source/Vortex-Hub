@@ -426,7 +426,34 @@ label({
     ZIndex = 6,
     Parent = KeyPage
 })
+-- ============================================================
+-- 🌈 RAINBOW CREDIT LINE
+-- ============================================================
+local CreditLabel = label({
+    Size = UDim2.new(1, -52, 0, 20),  -- full width minus padding
+    Position = UDim2.new(0, 52, 0, 42), -- sits right below "script loader v3.0"
+    Text = "⚡ Sourced from trusted devs – auto-updates when owners update! ⚡",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextWrapped = true,
+    ZIndex = 6,
+    Parent = KeyPage
+})
 
+-- Add rainbow gradient
+local CreditGradient = Instance.new("UIGradient")
+CreditGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),    -- Red
+    ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 255, 50)), -- Yellow
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(50, 255, 50)),  -- Green
+    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(50, 200, 255)), -- Cyan
+    ColorSequenceKeypoint.new(0.8, Color3.fromRGB(200, 50, 255)), -- Purple
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 50))     -- Red
+})
+CreditGradient.Parent = CreditLabel
+-- ============================================================
 new("Frame", {
     Size = UDim2.new(1, 0, 0, 1),
     Position = UDim2.new(0, 0, 0, 54),
